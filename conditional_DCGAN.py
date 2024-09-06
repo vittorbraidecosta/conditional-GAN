@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 img_save_path = 'images-C_dcgan'
 os.makedirs(img_save_path, exist_ok=True)
 
@@ -109,13 +110,13 @@ generator.apply(weights_init_normal)
 discriminator.apply(weights_init_normal)
 
 # Configure data loader
-os.makedirs('../../data', exist_ok=True)
+os.makedirs('data', exist_ok=True)
 dataloader = torch.utils.data.DataLoader(
-    datasets.MNIST('../../data', train=True, download=True,
+    datasets.MNIST('data', train=True, download=True,
                    transform=transforms.Compose([
                        transforms.Resize(args.img_size),
                        transforms.ToTensor(),
-                       transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+                       transforms.Normalize((0.5), (0.5))
                    ])),
     batch_size=args.batch_size, shuffle=True, drop_last=True)
 print('the data is ok')
@@ -132,21 +133,21 @@ for epoch in range(args.n_epochs):
         N_Class = args.n_classes
         img_size = args.img_size
         # Adversarial ground truths
-        valid = Variable(torch.ones(Batch_Size).cuda(), requires_grad=False)
-        fake = Variable(torch.zeros(Batch_Size).cuda(), requires_grad=False)
+        valid = Variable(torch.ones(Batch_Size).to(device), requires_grad=False)
+        fake = Variable(torch.zeros(Batch_Size).to(device), requires_grad=False)
 
         # Configure input
-        real_imgs = Variable(imgs.type(torch.FloatTensor).cuda())
+        real_imgs = Variable(imgs.type(torch.FloatTensor).to(device))
 
         real_y = torch.zeros(Batch_Size, N_Class)
         real_y = real_y.scatter_(1, labels.view(Batch_Size, 1), 1).view(Batch_Size, N_Class, 1, 1).contiguous()
-        real_y = Variable(real_y.expand(-1, -1, img_size, img_size).cuda())
+        real_y = Variable(real_y.expand(-1, -1, img_size, img_size).to(device))
 
         # Sample noise and labels as generator input
-        noise = Variable(torch.randn((Batch_Size, args.latent_dim,1,1)).cuda())
+        noise = Variable(torch.randn((Batch_Size, args.latent_dim,1,1)).to(device))
         gen_labels = (torch.rand(Batch_Size, 1) * N_Class).type(torch.LongTensor)
         gen_y = torch.zeros(Batch_Size, N_Class)
-        gen_y = Variable(gen_y.scatter_(1, gen_labels.view(Batch_Size, 1), 1).view(Batch_Size, N_Class,1,1).cuda())
+        gen_y = Variable(gen_y.scatter_(1, gen_labels.view(Batch_Size, 1), 1).view(Batch_Size, N_Class,1,1).to(device))
         # ---------------------
         #  Train Discriminator
         # ---------------------
@@ -179,11 +180,11 @@ for epoch in range(args.n_epochs):
 
         batches_done = epoch * len(dataloader) + i
         if batches_done % args.sample_interval == 0:
-            noise = Variable(torch.FloatTensor(np.random.normal(0, 1, (N_Class**2, args.latent_dim,1,1))).cuda())
+            noise = Variable(torch.FloatTensor(np.random.normal(0, 1, (N_Class**2, args.latent_dim,1,1))).to(device))
             #fixed labels
             y_ = torch.LongTensor(np.array([num for num in range(N_Class)])).view(N_Class,1).expand(-1,N_Class).contiguous()
             y_fixed = torch.zeros(N_Class**2, N_Class)
-            y_fixed = Variable(y_fixed.scatter_(1,y_.view(N_Class**2,1),1).view(N_Class**2, N_Class,1,1).cuda())
+            y_fixed = Variable(y_fixed.scatter_(1,y_.view(N_Class**2,1),1).view(N_Class**2, N_Class,1,1).to(device))
 
             gen_imgs = generator(noise, y_fixed).view(-1,C,H,W)
 
